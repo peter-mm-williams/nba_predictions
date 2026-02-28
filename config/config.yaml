@@ -1,0 +1,149 @@
+# NBA Prop Predictor - Main Configuration
+# Environment variables can override values using ${VAR_NAME:default} syntax
+
+environment: ${ENV:development}
+random_seed: 42
+
+paths:
+  data_dir: ${DATA_DIR:./data}
+  output_dir: ${OUTPUT_DIR:./outputs}
+  model_dir: ${MODEL_DIR:./outputs/models}
+  log_dir: ${LOG_DIR:./logs}
+
+# Data acquisition settings
+data:
+  seasons:
+    start: 2015
+    end: ${CURRENT_SEASON:2024}
+  sources:
+    nba_api:
+      rate_limit_seconds: 0.6
+      retry_attempts: 3
+      timeout_seconds: 30
+    basketball_reference:
+      enabled: true
+      rate_limit_seconds: 3.0
+
+# Data cleaning settings
+cleaning:
+  min_minutes_played: 5
+  min_games_for_player: 20
+  handle_trades: split_season
+  exclude_playoff_games: false
+
+# Feature engineering
+features:
+  rolling_windows: [3, 5, 10, 20]
+  target_stats:
+    - points
+    - rebounds
+    - three_pointers_made
+    - free_throws_made
+  temporal_features:
+    - days_rest
+    - back_to_back
+    - home_away
+    - season_game_number
+  opponent_features:
+    - defensive_rating_season
+    - pace_season
+    - position_defense_rank
+  player_features:
+    - season_average
+    - career_average
+    - usage_rate
+    - minutes_trend
+  team_features:
+    - team_pace
+    - team_offensive_rating
+    - teammate_injury_impact
+  sequence_length: 10
+
+# Model configurations
+models:
+  distribution:
+    type: negative_binomial
+    max_value: 60
+    num_bins: 61
+
+  tabular:
+    logistic:
+      solver: lbfgs
+      max_iter: 1000
+      class_weight: balanced
+    xgboost:
+      n_estimators: ${XGB_ESTIMATORS:500}
+      max_depth: 6
+      learning_rate: 0.05
+      early_stopping_rounds: 50
+      eval_metric: logloss
+
+  sequential:
+    embedding_dim: 64
+    hidden_dim: 128
+    num_layers: 2
+    dropout: 0.2
+    lstm:
+      bidirectional: false
+    transformer:
+      num_heads: 4
+      feedforward_dim: 256
+
+# Training settings
+training:
+  batch_size: ${BATCH_SIZE:64}
+  epochs: ${EPOCHS:100}
+  learning_rate: ${LR:0.001}
+  weight_decay: 0.0001
+  early_stopping_patience: 10
+  gradient_clip_norm: 1.0
+
+  splits:
+    train_end_season: 2022
+    val_end_season: 2023
+    test_end_season: 2024
+
+  device: ${DEVICE:cuda}
+  num_workers: ${NUM_WORKERS:4}
+  pin_memory: true
+
+  hyperopt:
+    enabled: false
+    n_trials: 50
+    timeout_hours: 4
+
+# Evaluation settings
+evaluation:
+  metrics:
+    - nll
+    - crps
+    - calibration_error
+    - mae
+    - rmse
+  calibration:
+    num_bins: 10
+  slices:
+    - position
+    - usage_tier
+    - home_away
+    - rest_days
+    - opponent_strength
+
+# Reporting
+reporting:
+  format: pdf
+  template: default
+  include_sections:
+    - executive_summary
+    - methodology
+    - feature_importance
+    - model_comparison
+    - calibration_analysis
+    - slice_analysis
+    - appendix
+
+# Logging
+logging:
+  level: ${LOG_LEVEL:INFO}
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_logging: true

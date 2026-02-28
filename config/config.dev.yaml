@@ -1,0 +1,19 @@
+# Development configuration overrides
+environment: development
+
+data:
+  seasons:
+    start: 2022
+    end: 2024
+
+training:
+  batch_size: 32
+  epochs: 10
+  device: cpu
+  num_workers: 0
+  pin_memory: false
+  hyperopt:
+    enabled: false
+
+logging:
+  level: DEBUG
