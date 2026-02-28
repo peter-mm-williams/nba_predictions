@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "nba-prop-predictor"
+version = "0.1.0"
+description = "NBA player prop prediction framework using sequence and tabular models"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = [
+    "nba_api>=1.4",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "torch>=2.0",
+    "xgboost>=2.0",
+    "scikit-learn>=1.3",
+    "optuna>=3.4",
+    "pyarrow>=14.0",
+    "pyyaml>=6.0",
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "jinja2>=3.1",
+    "weasyprint>=60.0",
+    "properscoring>=0.1",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "pytest-mock>=3.12",
+    "black>=23.0",
+    "ruff>=0.1",
+    "mypy>=1.7",
+    "ipykernel>=6.27",
+    "jupyter>=1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks integration tests",
+]
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true

@@ -1,0 +1,22 @@
+# Production/cloud configuration overrides
+environment: production
+
+data:
+  seasons:
+    start: 2015
+    end: 2024
+
+training:
+  batch_size: 128
+  epochs: 100
+  device: cuda
+  num_workers: 8
+  pin_memory: true
+  hyperopt:
+    enabled: true
+    n_trials: 100
+    timeout_hours: 8
+
+logging:
+  level: INFO
+  file_logging: true
