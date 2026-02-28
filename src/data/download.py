@@ -73,7 +73,11 @@ class NBADataDownloader:
         )
 
     def download_player_game_logs(self, season: int) -> pd.DataFrame:
-        """Download player-level game logs for a season.
+        """Download player-level game logs for a season via LeagueGameLog.
+
+        Uses LeagueGameLog with player_or_team_abbreviation='P' to fetch
+        all player game logs for the season in a single call (PlayerGameLog
+        requires a specific player_id).
 
         Args:
             season: Season start year (e.g., 2023 for 2023-24 season).
@@ -85,16 +89,20 @@ class NBADataDownloader:
         logger.info("Downloading player game logs for %s...", season_str)
 
         df = self._api_call_with_retry(
-            PlayerGameLog,
-            player_id_nullable="",
-            season_nullable=season_str,
-            season_type_nullable="Regular Season",
+            LeagueGameLog,
+            season=season_str,
+            season_type_all_star="Regular Season",
+            player_or_team_abbreviation="P",
         )
         df["SEASON"] = season
         return df
 
     def download_team_game_logs(self, season: int) -> pd.DataFrame:
-        """Download team-level game logs for a season.
+        """Download team-level game logs for a season via LeagueGameLog.
+
+        Uses LeagueGameLog with player_or_team_abbreviation='T' to fetch
+        all team game logs for the season in a single call (TeamGameLog
+        requires a specific team_id).
 
         Args:
             season: Season start year.
@@ -106,9 +114,62 @@ class NBADataDownloader:
         logger.info("Downloading team game logs for %s...", season_str)
 
         df = self._api_call_with_retry(
+            LeagueGameLog,
+            season=season_str,
+            season_type_all_star="Regular Season",
+            player_or_team_abbreviation="T",
+        )
+        df["SEASON"] = season
+        return df
+
+    def download_single_player_game_log(
+        self, player_id: int, season: int
+    ) -> pd.DataFrame:
+        """Download game logs for a single player in a season.
+
+        Args:
+            player_id: NBA player ID.
+            season: Season start year.
+
+        Returns:
+            DataFrame with player game logs.
+        """
+        season_str = nba_season_string(season)
+        logger.info(
+            "Downloading game log for player %d, season %s...", player_id, season_str
+        )
+
+        df = self._api_call_with_retry(
+            PlayerGameLog,
+            player_id=player_id,
+            season=season_str,
+            season_type_all_star="Regular Season",
+        )
+        df["SEASON"] = season
+        return df
+
+    def download_single_team_game_log(
+        self, team_id: int, season: int
+    ) -> pd.DataFrame:
+        """Download game logs for a single team in a season.
+
+        Args:
+            team_id: NBA team ID.
+            season: Season start year.
+
+        Returns:
+            DataFrame with team game logs.
+        """
+        season_str = nba_season_string(season)
+        logger.info(
+            "Downloading game log for team %d, season %s...", team_id, season_str
+        )
+
+        df = self._api_call_with_retry(
             TeamGameLog,
-            season_nullable=season_str,
-            season_type_nullable="Regular Season",
+            team_id=team_id,
+            season=season_str,
+            season_type_all_star="Regular Season",
         )
         df["SEASON"] = season
         return df
@@ -116,23 +177,15 @@ class NBADataDownloader:
     def download_league_game_logs(self, season: int) -> pd.DataFrame:
         """Download league-wide game logs for a season.
 
+        Alias for download_player_game_logs. Kept for backwards compatibility.
+
         Args:
             season: Season start year.
 
         Returns:
             DataFrame with league game logs.
         """
-        season_str = nba_season_string(season)
-        logger.info("Downloading league game logs for %s...", season_str)
-
-        df = self._api_call_with_retry(
-            LeagueGameLog,
-            season=season_str,
-            season_type_all_star="Regular Season",
-            player_or_team_abbreviation="P",
-        )
-        df["SEASON"] = season
-        return df
+        return self.download_player_game_logs(season)
 
     def download_all_seasons(self, start: int, end: int) -> None:
         """Download all data for a range of seasons and save to disk.

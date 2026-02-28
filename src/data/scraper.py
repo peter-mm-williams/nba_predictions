@@ -28,17 +28,26 @@ class BasketballReferenceScraper:
         self.enabled = br_config.get("enabled", True)
         self.rate_limit = br_config.get("rate_limit_seconds", 3.0)
         self.data_dir = Path(config.get("data_dir", "./data/raw/supplementary"))
+        self.retry_attempts = br_config.get("retry_attempts", 3)
         self.session = requests.Session()
-        self.session.headers.update(
-            {"User-Agent": "NBA Prop Predictor Research (educational use)"}
-        )
+        self.session.headers.update({
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Referer": "https://www.basketball-reference.com/",
+        })
 
     def _rate_limit_pause(self) -> None:
         """Pause to respect rate limits."""
         time.sleep(self.rate_limit)
 
     def _fetch_page(self, url: str) -> BeautifulSoup:
-        """Fetch and parse a page.
+        """Fetch and parse a page with retry on failure.
 
         Args:
             url: Full URL to fetch.
@@ -47,12 +56,40 @@ class BasketballReferenceScraper:
             BeautifulSoup object of the page.
 
         Raises:
-            requests.HTTPError: If the request fails.
+            RuntimeError: If all retry attempts fail.
         """
-        self._rate_limit_pause()
-        response = self.session.get(url, timeout=30)
-        response.raise_for_status()
-        return BeautifulSoup(response.text, "html.parser")
+        last_error = None
+        for attempt in range(1, self.retry_attempts + 1):
+            self._rate_limit_pause()
+            try:
+                response = self.session.get(url, timeout=30)
+                response.raise_for_status()
+                return BeautifulSoup(response.text, "html.parser")
+            except requests.HTTPError as e:
+                last_error = e
+                if response.status_code == 429 or response.status_code >= 500:
+                    # Rate limited or server error — retry with backoff
+                    wait_time = self.rate_limit * (2**attempt)
+                    logger.warning(
+                        "HTTP %d fetching %s (attempt %d/%d). Retrying in %.0fs...",
+                        response.status_code, url, attempt, self.retry_attempts, wait_time,
+                    )
+                    time.sleep(wait_time)
+                    continue
+                # 403/404 and other client errors — don't retry
+                raise
+            except requests.RequestException as e:
+                last_error = e
+                wait_time = self.rate_limit * (2**attempt)
+                logger.warning(
+                    "Request failed for %s (attempt %d/%d): %s. Retrying in %.0fs...",
+                    url, attempt, self.retry_attempts, e, wait_time,
+                )
+                time.sleep(wait_time)
+
+        raise RuntimeError(
+            f"Failed to fetch {url} after {self.retry_attempts} attempts: {last_error}"
+        )
 
     def scrape_team_ratings(self, season: int) -> pd.DataFrame:
         """Scrape team offensive/defensive ratings for a season.
