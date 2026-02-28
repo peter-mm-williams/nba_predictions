@@ -273,13 +273,20 @@ class FeatureEngineer:
         """Get the list of engineered feature column names."""
         non_feature_cols = {
             "PLAYER_ID", "PLAYER_NAME", "TEAM_ID", "TEAM_ABBREVIATION",
-            "GAME_ID", "GAME_DATE", "SEASON", "MATCHUP", "WL",
+            "TEAM_NAME", "GAME_ID", "GAME_DATE", "SEASON", "SEASON_YEAR",
+            "SEASON_ID", "MATCHUP", "WL",
             "PTS", "REB", "AST", "FG3M", "FTM", "FGA", "FGM",
-            "FG3A", "FTA", "OREB", "DREB", "STL", "BLK", "TOV",
+            "FG_PCT", "FG3A", "FG3_PCT", "FTA", "FT_PCT",
+            "OREB", "DREB", "STL", "BLK", "TOV", "BLKA", "PFD",
             "PF", "PLUS_MINUS", "MIN", "IS_OUTLIER", "IS_TRADED_SEASON",
             "OPP_TEAM", "VIDEO_AVAILABLE",
+            "NBA_FANTASY_PTS", "DD2", "TD3",
         }
-        return [col for col in df.columns if col not in non_feature_cols]
+        # Also exclude any _RANK columns from PlayerGameLogs/TeamGameLogs
+        return [
+            col for col in df.columns
+            if col not in non_feature_cols and not col.endswith("_RANK")
+        ]
 
     @staticmethod
     def get_target_columns() -> dict[str, str]:

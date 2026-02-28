@@ -5,9 +5,10 @@ from pathlib import Path
 
 import pandas as pd
 from nba_api.stats.endpoints import (
-    LeagueGameLog,
     PlayerGameLog,
+    PlayerGameLogs,
     TeamGameLog,
+    TeamGameLogs,
 )
 from nba_api.stats.static import players as nba_players
 from nba_api.stats.static import teams as nba_teams
@@ -73,11 +74,11 @@ class NBADataDownloader:
         )
 
     def download_player_game_logs(self, season: int) -> pd.DataFrame:
-        """Download player-level game logs for a season via LeagueGameLog.
+        """Download player-level game logs for a season via PlayerGameLogs.
 
-        Uses LeagueGameLog with player_or_team_abbreviation='P' to fetch
-        all player game logs for the season in a single call (PlayerGameLog
-        requires a specific player_id).
+        Uses PlayerGameLogs (plural) to fetch all player game logs for the
+        season in a single call. This endpoint returns PLAYER_ID, PLAYER_NAME,
+        TEAM_ID, FG3M, and all other box score columns needed downstream.
 
         Args:
             season: Season start year (e.g., 2023 for 2023-24 season).
@@ -89,20 +90,19 @@ class NBADataDownloader:
         logger.info("Downloading player game logs for %s...", season_str)
 
         df = self._api_call_with_retry(
-            LeagueGameLog,
-            season=season_str,
-            season_type_all_star="Regular Season",
-            player_or_team_abbreviation="P",
+            PlayerGameLogs,
+            season_nullable=season_str,
+            season_type_nullable="Regular Season",
         )
         df["SEASON"] = season
         return df
 
     def download_team_game_logs(self, season: int) -> pd.DataFrame:
-        """Download team-level game logs for a season via LeagueGameLog.
+        """Download team-level game logs for a season via TeamGameLogs.
 
-        Uses LeagueGameLog with player_or_team_abbreviation='T' to fetch
-        all team game logs for the season in a single call (TeamGameLog
-        requires a specific team_id).
+        Uses TeamGameLogs (plural) to fetch all team game logs for the
+        season in a single call. This endpoint returns TEAM_ID, FG3M,
+        and all other box score columns needed downstream.
 
         Args:
             season: Season start year.
@@ -114,10 +114,9 @@ class NBADataDownloader:
         logger.info("Downloading team game logs for %s...", season_str)
 
         df = self._api_call_with_retry(
-            LeagueGameLog,
-            season=season_str,
-            season_type_all_star="Regular Season",
-            player_or_team_abbreviation="T",
+            TeamGameLogs,
+            season_nullable=season_str,
+            season_type_nullable="Regular Season",
         )
         df["SEASON"] = season
         return df
