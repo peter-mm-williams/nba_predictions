@@ -186,12 +186,17 @@ class NBADataDownloader:
         """
         return self.download_player_game_logs(season)
 
-    def download_all_seasons(self, start: int, end: int) -> None:
+    # Columns that must be present in downloaded player game logs.
+    # Used to detect stale files from older endpoints.
+    REQUIRED_PLAYER_COLUMNS = {"PLAYER_ID", "PLAYER_NAME", "GAME_DATE", "PTS", "FG3M"}
+
+    def download_all_seasons(self, start: int, end: int, force: bool = False) -> None:
         """Download all data for a range of seasons and save to disk.
 
         Args:
             start: First season start year.
             end: Last season start year (inclusive).
+            force: If True, re-download even if files exist.
         """
         box_scores_dir = ensure_dir(self.data_dir / "box_scores")
 
@@ -199,9 +204,19 @@ class NBADataDownloader:
             season_str = nba_season_string(season)
             output_path = box_scores_dir / f"player_game_logs_{season}.parquet"
 
-            if output_path.exists():
-                logger.info("Season %s already downloaded, skipping.", season_str)
-                continue
+            if output_path.exists() and not force:
+                # Validate that cached file has required columns
+                try:
+                    existing = pd.read_parquet(output_path, columns=["PLAYER_ID"])
+                except Exception:
+                    logger.warning(
+                        "Season %s file is missing required columns. Re-downloading...",
+                        season_str,
+                    )
+                    output_path.unlink()
+                else:
+                    logger.info("Season %s already downloaded, skipping.", season_str)
+                    continue
 
             try:
                 df = self.download_player_game_logs(season)
@@ -216,12 +231,13 @@ class NBADataDownloader:
                 logger.error("Failed to download season %s: %s", season_str, e)
 
             # Also download team logs
-            try:
-                team_df = self.download_team_game_logs(season)
-                team_path = box_scores_dir / f"team_game_logs_{season}.parquet"
-                save_parquet(team_df, team_path)
-            except Exception as e:
-                logger.error("Failed to download team logs for %s: %s", season_str, e)
+            team_path = box_scores_dir / f"team_game_logs_{season}.parquet"
+            if not team_path.exists() or force:
+                try:
+                    team_df = self.download_team_game_logs(season)
+                    save_parquet(team_df, team_path)
+                except Exception as e:
+                    logger.error("Failed to download team logs for %s: %s", season_str, e)
 
     @staticmethod
     def get_all_players() -> pd.DataFrame:
