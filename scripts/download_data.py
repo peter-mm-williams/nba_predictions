@@ -44,6 +44,11 @@ def main():
         action="store_true",
         help="Skip Basketball Reference scraping",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-download even if data files already exist",
+    )
     args = parser.parse_args()
 
     config = Config.load(args.config, args.override)
@@ -57,7 +62,7 @@ def main():
 
     # Download from NBA API
     downloader = NBADataDownloader(data_config)
-    downloader.download_all_seasons(start, end)
+    downloader.download_all_seasons(start, end, force=args.force)
 
     # Scrape supplementary data
     if not args.skip_bbref and data_config.get("sources", {}).get("basketball_reference", {}).get("enabled", True):

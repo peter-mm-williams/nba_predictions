@@ -28,7 +28,7 @@ logger = get_logger("pipeline")
 ALL_STAGES = ["download", "clean", "features", "sequences", "train", "evaluate"]
 
 
-def run_download(config: Config) -> None:
+def run_download(config: Config, force: bool = False) -> None:
     """Run data download stage."""
     from src.data.download import NBADataDownloader
     from src.data.scraper import BasketballReferenceScraper
@@ -39,11 +39,14 @@ def run_download(config: Config) -> None:
     end = data_config["seasons"]["end"]
 
     downloader = NBADataDownloader(data_config)
-    downloader.download_all_seasons(start, end)
+    downloader.download_all_seasons(start, end, force=force)
 
     if data_config.get("sources", {}).get("basketball_reference", {}).get("enabled"):
         scraper = BasketballReferenceScraper(data_config)
         scraper.scrape_all_seasons(start, end)
+
+
+REQUIRED_RAW_COLUMNS = {"PLAYER_ID", "PLAYER_NAME", "GAME_DATE", "PTS", "FG3M", "FTM", "REB"}
 
 
 def run_clean(config: Config) -> pd.DataFrame:
@@ -58,10 +61,21 @@ def run_clean(config: Config) -> pd.DataFrame:
     # Load all season files
     dfs = []
     for path in sorted(raw_dir.glob("player_game_logs_*.parquet")):
-        dfs.append(load_parquet(path))
+        season_df = load_parquet(path)
+        missing = REQUIRED_RAW_COLUMNS - set(season_df.columns)
+        if missing:
+            logger.error(
+                "File %s is missing required columns: %s. "
+                "This file was likely downloaded with an older version. "
+                "Delete it and re-run the download stage, or run with --force-download.",
+                path.name,
+                missing,
+            )
+            raise SystemExit(1)
+        dfs.append(season_df)
 
     if not dfs:
-        logger.error("No raw data found in %s", raw_dir)
+        logger.error("No raw data found in %s. Run the download stage first.", raw_dir)
         return pd.DataFrame()
 
     df = pd.concat(dfs, ignore_index=True)
@@ -237,6 +251,7 @@ def main():
     )
     parser.add_argument("--model", type=str, default="xgboost", choices=["xgboost", "logistic", "lstm", "transformer"])
     parser.add_argument("--stat", type=str, default="points", choices=["points", "rebounds", "three_pointers_made", "free_throws_made"])
+    parser.add_argument("--force-download", action="store_true", help="Force re-download of all data, even if files exist.")
     args = parser.parse_args()
 
     config = Config.load(args.config, args.override)
@@ -249,7 +264,7 @@ def main():
 
     if "download" in stages:
         logger.info("=== Stage: Download ===")
-        run_download(config)
+        run_download(config, force=args.force_download)
 
     if "clean" in stages:
         logger.info("=== Stage: Clean ===")
